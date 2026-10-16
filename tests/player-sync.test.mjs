@@ -1,0 +1,10 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {playerSystems,playerSessions} from '../src/selectors.js';
+import {validateArchive,archiveFile} from '../src/storage.js';
+const system=(id,owned,sessions=[])=>({id,name:id,owned,cover:'',materials:[],sessions});
+const session=(role,id=role)=>({id,title:id,role,date:'2026-10-16',time:'19:00',hours:4,campaign:'',notes:''});
+test('owned system enters player membership after player session, hidden by default',()=>{const s=system('owned',true,[session('gm')]);assert.equal(playerSystems([s],true).length,0);s.sessions.push(session('player'));assert.equal(playerSystems([s]).length,0);assert.equal(playerSystems([s],true)[0],s)});
+test('filter includes owned player systems, excludes owned GM-only systems',()=>{const a=system('unowned',false),b=system('both',true,[session('player'),session('gm')]),c=system('gm-only',true,[session('gm')]);assert.deepEqual(playerSystems([a,b,c]).map(s=>s.id),['unowned']);assert.deepEqual(playerSystems([a,b,c],true).map(s=>s.id),['unowned','both']);assert.equal(playerSessions(b).length,1)});
+test('role change and deletion remove derived membership without duplicate records',()=>{const s=system('both',true,[session('player')]);assert.equal(playerSystems([s],true).length,1);s.sessions[0].role='gm';assert.equal(playerSystems([s],true).length,0);s.sessions=[];assert.equal(playerSystems([s],true).length,0)});
+test('transfer to library preserves history and filter behavior through JSON export/import',()=>{const s=system('transfer',false,[session('player'),session('gm')]);s.owned=true;const restored=validateArchive(JSON.parse(archiveFile([s])));assert.equal(restored.length,1);assert.equal(playerSystems(restored).length,0);assert.equal(playerSystems(restored,true).length,1);assert.equal(playerSessions(restored[0])[0].role,'player');assert.equal(restored[0].sessions.length,2)});
